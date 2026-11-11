@@ -8,40 +8,37 @@ import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 const int pillCount = 8;
-const String _pillsKey = 'pill_slots_v1';
-const String _takenKey = 'taken_by_date_v1';
-
-final FlutterLocalNotificationsPlugin notifications =
-    FlutterLocalNotificationsPlugin();
+const _pillsKey = 'pill_slots_v1';
+const _takenKey = 'taken_by_date_v1';
+final notifications = FlutterLocalNotificationsPlugin();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await _initializeNotifications();
+  await initializeNotifications();
   runApp(const GrandmaPillTrackerApp());
 }
 
-Future<void> _initializeNotifications() async {
+Future<void> initializeNotifications() async {
   tzdata.initializeTimeZones();
   try {
     final dynamic zone = await FlutterTimezone.getLocalTimezone();
     final String name = zone is String ? zone : zone.identifier as String;
     tz.setLocalLocation(tz.getLocation(name));
   } catch (_) {
-    // If timezone lookup is unavailable, use the plugin's default local zone.
+    // Keep package default timezone if device lookup is unavailable.
   }
-
-  const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const windows = WindowsInitializationSettings(
-    appName: 'Grandma Pill Tracker',
-    appUserModelId: 'com.example.grandmapilltracker',
-    guid: '5a4a4dc7-86e7-44c8-80ab-dbbaf9c3cbe1',
+  const settings = InitializationSettings(
+    android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+    windows: WindowsInitializationSettings(
+      appName: 'Grandma Pill Tracker',
+      appUserModelId: 'com.example.grandmapilltracker',
+      guid: '5a4a4dc7-86e7-44c8-80ab-dbbaf9c3cbe1',
+    ),
   );
-  const settings = InitializationSettings(android: android, windows: windows);
   await notifications.initialize(settings: settings);
-
-  final androidPlugin = notifications.resolvePlatformSpecificImplementation<
+  final android = notifications.resolvePlatformSpecificImplementation<
       AndroidFlutterLocalNotificationsPlugin>();
-  await androidPlugin?.requestNotificationsPermission();
+  await android?.requestNotificationsPermission();
 }
 
 class PillSlot {
@@ -79,26 +76,19 @@ class GrandmaPillTrackerApp extends StatelessWidget {
   const GrandmaPillTrackerApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Grandma Pill Tracker',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFB66C91),
-          brightness: Brightness.light,
+  Widget build(BuildContext context) => MaterialApp(
+        title: 'Grandma Pill Tracker',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFFB66C91),
+            brightness: Brightness.light,
+          ),
+          useMaterial3: true,
+          scaffoldBackgroundColor: const Color(0xFFFFF8FB),
         ),
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFFFF8FB),
-        cardTheme: const CardThemeData(
-          elevation: 0,
-          color: Colors.white,
-          margin: EdgeInsets.zero,
-        ),
-      ),
-      home: const TrackerHomePage(),
-    );
-  }
+        home: const TrackerHomePage(),
+      );
 }
 
 class TrackerHomePage extends StatefulWidget {
@@ -112,7 +102,6 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
   List<PillSlot> pills = List.generate(pillCount, (_) => PillSlot.empty());
   Set<String> taken = {};
   bool loading = true;
-  bool remindersPermissionGranted = true;
 
   String get todayKey {
     final now = DateTime.now();
@@ -121,15 +110,15 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
         '${now.day.toString().padLeft(2, '0')}';
   }
 
-  String _takenId(int index) => '$todayKey:$index';
+  String takenId(int index) => '$todayKey:$index';
 
   @override
   void initState() {
     super.initState();
-    _load();
+    loadData();
   }
 
-  Future<void> _load() async {
+  Future<void> loadData() async {
     final prefs = await SharedPreferences.getInstance();
     final rawPills = prefs.getString(_pillsKey);
     final rawTaken = prefs.getString(_takenKey);
@@ -139,8 +128,7 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
         pills = List.generate(
           pillCount,
           (i) => i < decoded.length
-              ? PillSlot.fromJson(
-                  Map<String, dynamic>.from(decoded[i] as Map))
+              ? PillSlot.fromJson(Map<String, dynamic>.from(decoded[i] as Map))
               : PillSlot.empty(),
         );
       } catch (_) {
@@ -159,10 +147,10 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
     }
     if (!mounted) return;
     setState(() => loading = false);
-    await _rescheduleAll();
+    await rescheduleAll();
   }
 
-  Future<void> _savePills() async {
+  Future<void> savePills() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _pillsKey,
@@ -170,10 +158,10 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
     );
   }
 
-  Future<void> _saveTaken() async {
+  Future<void> saveTaken() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_takenKey);
     Map<String, dynamic> history = {};
+    final raw = prefs.getString(_takenKey);
     if (raw != null) {
       try {
         history = Map<String, dynamic>.from(jsonDecode(raw) as Map);
@@ -183,29 +171,23 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
     await prefs.setString(_takenKey, jsonEncode(history));
   }
 
-  Future<void> _rescheduleAll() async {
+  Future<void> rescheduleAll() async {
     await notifications.cancelAll();
     for (var i = 0; i < pills.length; i++) {
       final pill = pills[i];
-      if (!pill.enabled || pill.name.trim().isEmpty) continue;
-      await _schedulePill(i, pill);
+      if (pill.enabled && pill.name.trim().isNotEmpty) {
+        await schedulePill(i, pill);
+      }
     }
   }
 
-  Future<void> _schedulePill(int index, PillSlot pill) async {
+  Future<void> schedulePill(int index, PillSlot pill) async {
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      pill.hour,
-      pill.minute,
-    );
+      tz.local, now.year, now.month, now.day, pill.hour, pill.minute);
     if (!scheduled.isAfter(now)) {
       scheduled = scheduled.add(const Duration(days: 1));
     }
-
     const androidDetails = AndroidNotificationDetails(
       'pill_reminders',
       'Pill reminders',
@@ -213,7 +195,6 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
       importance: Importance.high,
       priority: Priority.high,
     );
-    const windowsDetails = WindowsNotificationDetails();
     await notifications.zonedSchedule(
       id: index + 1,
       title: 'Medication reminder',
@@ -221,14 +202,14 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
       scheduledDate: scheduled,
       notificationDetails: const NotificationDetails(
         android: androidDetails,
-        windows: windowsDetails,
+        windows: WindowsNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
 
-  Future<void> _editPill(int index) async {
+  Future<void> editPill(int index) async {
     final original = pills[index];
     final nameController = TextEditingController(text: original.name);
     var enabled = original.enabled;
@@ -260,13 +241,12 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Enable reminder'),
                   value: enabled,
-                  onChanged: (value) =>
-                      setDialogState(() => enabled = value),
+                  onChanged: (value) => setDialogState(() => enabled = value),
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.schedule),
-                  label: Text(_formatTime(hour, minute)),
+                  label: Text(formatTime(hour, minute)),
                   onPressed: () async {
                     final selected = await showTimePicker(
                       context: context,
@@ -282,8 +262,7 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Use the schedule confirmed by Grandma’s pharmacist or '
-                  'prescription label.',
+                  'Use the schedule confirmed by Grandma’s pharmacist or prescription label.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -314,41 +293,38 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
     nameController.dispose();
     if (result == null) return;
     setState(() => pills[index] = result);
-    await _savePills();
-    await _rescheduleAll();
+    await savePills();
+    await rescheduleAll();
   }
 
-  Future<void> _toggleTaken(int index, bool value) async {
+  Future<void> toggleTaken(int index, bool value) async {
     setState(() {
       if (value) {
-        taken.add(_takenId(index));
+        taken.add(takenId(index));
       } else {
-        taken.remove(_takenId(index));
+        taken.remove(takenId(index));
       }
     });
-    await _saveTaken();
+    await saveTaken();
   }
 
-  String _formatTime(int hour, int minute) {
+  String formatTime(int hour, int minute) {
     final h = hour % 12 == 0 ? 12 : hour % 12;
-    final m = minute.toString().padLeft(2, '0');
-    return '$h:$m ${hour < 12 ? 'AM' : 'PM'}';
+    return '$h:${minute.toString().padLeft(2, '0')} ${hour < 12 ? 'AM' : 'PM'}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final completed = List.generate(pillCount, (i) => taken.contains(_takenId(i)))
-        .where((value) => value)
-        .length;
+    final completed = List.generate(
+      pillCount, (i) => taken.contains(takenId(i))).where((v) => v).length;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Grandma’s Pill Tracker'),
-        centerTitle: false,
         actions: [
           IconButton(
-            tooltip: 'Reminder settings',
-            onPressed: _showReminderInfo,
+            tooltip: 'Reminder information',
+            onPressed: showReminderInfo,
             icon: const Icon(Icons.notifications_active_outlined),
           ),
         ],
@@ -361,15 +337,12 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    _ProgressCard(completed: completed),
+                    ProgressCard(completed: completed),
                     const SizedBox(height: 16),
-                    Text(
-                      'Today’s pills',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
+                    Text('Today’s pills',
+                        style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 8),
-                    for (var i = 0; i < pillCount; i++)
-                      _pillCard(i),
+                    for (var i = 0; i < pillCount; i++) pillCard(i),
                     const SizedBox(height: 16),
                     const Card(
                       child: Padding(
@@ -384,8 +357,7 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
                                 'This app is a reminder and checklist only. '
                                 'It cannot confirm that a medicine was swallowed '
                                 'or determine what should be taken. Follow the '
-                                'prescription label and healthcare professional’s '
-                                'instructions.',
+                                'prescription label and healthcare professional’s instructions.',
                               ),
                             ),
                           ],
@@ -399,16 +371,14 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
     );
   }
 
-  Widget _pillCard(int index) {
+  Widget pillCard(int index) {
     final pill = pills[index];
-    final isTaken = taken.contains(_takenId(index));
+    final isTaken = taken.contains(takenId(index));
     return Card(
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         leading: Checkbox(
           value: isTaken,
-          onChanged: (value) => _toggleTaken(index, value ?? false),
+          onChanged: (value) => toggleTaken(index, value ?? false),
         ),
         title: Text(
           pill.name.isEmpty ? 'Set up pill ${index + 1}' : pill.name,
@@ -422,27 +392,27 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
           pill.name.isEmpty
               ? 'Tap Edit to enter the pill name'
               : pill.enabled
-                  ? 'Reminder: ${_formatTime(pill.hour, pill.minute)}'
+                  ? 'Reminder: ${formatTime(pill.hour, pill.minute)}'
                   : 'Reminder off',
         ),
         trailing: TextButton(
-          onPressed: () => _editPill(index),
+          onPressed: () => editPill(index),
           child: const Text('Edit'),
         ),
       ),
     );
   }
 
-  Future<void> _showReminderInfo() async {
+  Future<void> showReminderInfo() async {
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Reminders'),
         content: const Text(
-          'Edit any pill and turn on its reminder. Choose the time with the '
-          'time picker. Notifications must be allowed in device settings. '
-          'Android and Windows handle background notifications differently, '
-          'so test each reminder on the device before relying on it.',
+          'Edit any pill and turn on its reminder. Choose its time with the time picker. '
+          'Notifications must be allowed in device settings. Android and Windows '
+          'handle background notifications differently, so test each reminder '
+          'on the device before relying on it.',
         ),
         actions: [
           TextButton(
@@ -455,46 +425,41 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
   }
 }
 
-class _ProgressCard extends StatelessWidget {
-  const _ProgressCard({required this.completed});
-
+class ProgressCard extends StatelessWidget {
+  const ProgressCard({super.key, required this.completed});
   final int completed;
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: const Color(0xFFF9EAF1),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Daily progress',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '$completed of $pillCount',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(width: 8),
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 5),
-                  child: Text('checked off today'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            LinearProgressIndicator(value: completed / pillCount),
-          ],
+  Widget build(BuildContext context) => Card(
+        color: const Color(0xFFF9EAF1),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Daily progress',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '$completed of $pillCount',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 5),
+                    child: Text('checked off today'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              LinearProgressIndicator(value: completed / pillCount),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
 }

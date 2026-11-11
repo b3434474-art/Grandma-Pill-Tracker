@@ -1,11 +1,9 @@
 name: grandma_pill_tracker
-description: A private, local-first daily pill checklist for Windows and Android.
+description: Local-first checklist for eight medication entries, Android and Windows.
 publish_to: "none"
 version: 1.0.0+1
-
 environment:
   sdk: ">=3.3.0 <4.0.0"
-
 dependencies:
   flutter:
     sdk: flutter
@@ -13,11 +11,9 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   timezone: ^0.10.0
   flutter_timezone: ^4.1.0
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
-
 flutter:
   uses-material-design: true
