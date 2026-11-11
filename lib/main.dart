@@ -552,7 +552,7 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : LayoutBuilder(
-              builder: (context, constraints) => Center(
+              builder: (context, _) => Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1260),
                   child: ListView(
@@ -838,7 +838,7 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
-                    '$index'.padLeft(2, '0'),
+                    '${index + 1}'.padLeft(2, '0'),
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: accent,
