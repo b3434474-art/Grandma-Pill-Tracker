@@ -891,7 +891,7 @@ class _TrackerHomePageState extends State<TrackerHomePage> {
               ],
             ),
             const Spacer(),
-            Divider(height: 1, color: const Color(0xFFF0EAF0)),
+            const Divider(height: 1, color: Color(0xFFF0EAF0)),
             const SizedBox(height: 5),
             Row(
               children: [

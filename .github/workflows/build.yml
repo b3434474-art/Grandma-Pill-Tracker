@@ -22,6 +22,8 @@ jobs:
         run: flutter pub get
       - name: Analyze Dart code
         run: flutter analyze --no-pub
+      - name: Run widget tests
+        run: flutter test --no-pub
       - name: Build Android APK
         run: flutter build apk --release
       - uses: actions/upload-artifact@v4
@@ -42,6 +44,8 @@ jobs:
         run: flutter pub get
       - name: Analyze Dart code
         run: flutter analyze --no-pub
+      - name: Run widget tests
+        run: flutter test --no-pub
       - name: Build Windows app
         run: flutter build windows --release
       - uses: actions/upload-artifact@v4
