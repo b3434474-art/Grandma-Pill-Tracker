@@ -16,12 +16,14 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-      # The repository contains shared Dart source. Generate native platform
-      # runners in CI so Gradle and the Android manifest are present.
       - name: Generate Android and Windows platform projects
         run: flutter create --platforms=android,windows --project-name=grandma_pill_tracker .
-      - run: flutter pub get
-      - run: flutter build apk --release
+      - name: Get packages
+        run: flutter pub get
+      - name: Analyze Dart code
+        run: flutter analyze --no-pub
+      - name: Build Android APK
+        run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
           name: grandma-pill-tracker-android
@@ -36,8 +38,12 @@ jobs:
           channel: stable
       - name: Generate Android and Windows platform projects
         run: flutter create --platforms=android,windows --project-name=grandma_pill_tracker .
-      - run: flutter pub get
-      - run: flutter build windows --release
+      - name: Get packages
+        run: flutter pub get
+      - name: Analyze Dart code
+        run: flutter analyze --no-pub
+      - name: Build Windows app
+        run: flutter build windows --release
       - uses: actions/upload-artifact@v4
         with:
           name: grandma-pill-tracker-windows
