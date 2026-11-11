@@ -16,6 +16,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+      # The repository contains shared Dart source. Generate native platform
+      # runners in CI so Gradle and the Android manifest are present.
+      - name: Generate Android and Windows platform projects
+        run: flutter create --platforms=android,windows --project-name=grandma_pill_tracker .
       - run: flutter pub get
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
@@ -30,7 +34,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-      - run: flutter config --enable-windows-desktop
+      - name: Generate Android and Windows platform projects
+        run: flutter create --platforms=android,windows --project-name=grandma_pill_tracker .
       - run: flutter pub get
       - run: flutter build windows --release
       - uses: actions/upload-artifact@v4
